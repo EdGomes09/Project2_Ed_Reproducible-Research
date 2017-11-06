@@ -1,0 +1,186 @@
+---
+title: "Project2_Ed_StormData"
+author: "EdGomes"
+date: "4 de novembro de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+***
+***
+
+##Guide
+
+1. _Synopsis_
+
+2. _Loading and preprocessing the data Load the data (i.e. read.csv()) Process/transform the data (if necessary) into a format suitable for your analysis_
+
+   _Decompressing files_
+  
+   _Harmful Events to  Population Health_
+  
+   _Economic Consequences_
+
+3. _Results_
+
+   _Harmful Events to  Population Health_
+  
+   _Economic Consequences_
+
+
+***
+
+## 1. Synopsis
+
+This project satisfies the Johns Hopkins Reproducible Research course offered through Coursera, Project 2 requirements. It loads a data set, performs some processing, and produces some charts. The data involved concerns storm and other severe weather events can cause both public health and economic problems. 
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+***
+##2.Loading and preprocessing the data
+
+The data is in an unzipped file named ["StormData.csv.bz2"](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2). If it has not already been loaded, it is loaded into memory.
+
+
+```{r, cache=TRUE}
+ArqStorm <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2 "
+destStorm<-"D:/OneDrive/Software R/coursera/Reproducible Research/Project2/StormData.csv.bz2"
+download.file(ArqStorm,destStorm, mode = "wb")
+```
+
+#### Decompressing files _StormData.csv.bz2_
+```{r, cache=TRUE}
+if(!file.exists('StormData.csv')){
+ library(R.utils) 
+  bunzip2("StormData.csv.bz2", "StormData.csv")}
+```
+####Cleaning Storm Data
+* _Loading and Exploring Data to first ideas of analysis_
+
+```{r}
+Storm <- read.csv("StormData.csv")
+names(Storm)
+```
+
+***
+#### _Harmful Events to  Population Health_
+* _To evaluate harmful events to population Health, the fatalities and injuries total for each event type (EVTYPE) are calculated. The code chunk for this calculation are shown as follows._
+```{r}
+library(dplyr)
+Storm_Fatalities <- Storm %>%
+  select(EVTYPE, FATALITIES) %>%
+  group_by(EVTYPE) %>%
+  summarise(total.fatalities = sum(FATALITIES)) %>%
+  arrange(-total.fatalities)
+
+head(Storm_Fatalities, 20)
+```
+```{r}
+Storm_injuries <- Storm %>%
+  select(EVTYPE, INJURIES) %>% group_by(EVTYPE) %>%
+  summarise(total.injuries = sum(INJURIES)) %>%
+  arrange(-total.injuries)
+
+head(Storm_injuries, 20)
+```
+
+***
+
+#### _Economic Consequences_
+```{r}
+Storm.Economic <- Storm%>%
+  select(EVTYPE, PROPDMG,PROPDMGEXP,CROPDMG,CROPDMGEXP)
+```
+
+```{r}
+Symbol <- sort(unique(as.character(Storm.Economic$PROPDMGEXP)))
+Symbol
+Mult <- c(0,0,0,1,10,10,10,10,10,10,10,10,10,10^9,10^2,10^2,10^3,10^6,10^6)
+```
+* _PROPDMGEXP and CROPDMGEXP can be interpreted as the following:_
+
+"_blank_" -> x 0
+
+"-" -> x 0
+
+"?" -> x 0
+
+"+" -> x 1
+
+"H", "h" -> hundreds = x 100
+
+"K", "K" -> kilos = x 1,000
+
+"M", "m" -> millions = x 1,000,000
+
+"B","b" -> billions = x 1,000,000,000
+
+
+
+
+
+```{r}
+Convert <- data.frame(Symbol, Mult)
+Convert
+```
+
+
+***
+```{r}
+Storm.Economic$PropMult<- Convert$Mult[match(Storm$PROPDMGEXP, Convert$Symbol)]
+Storm.Economic$CropMult<- Convert$Mult[match(Storm$CROPDMGEXP, Convert$Symbol)]
+```
+```{r}
+Storm.Economic<- Storm.Economic %>% 
+  mutate(PROPDMG = PROPDMG*PropMult) %>% 
+  mutate(CROPDMG = CROPDMG*CropMult) %>% 
+  mutate(TOTAL.DMG = PROPDMG+CROPDMG)
+
+Economic.total <- Storm.Economic %>%
+  group_by(EVTYPE) %>%
+  summarize(TOTAL.DMG.EVTYPE = sum(TOTAL.DMG))%>%
+  arrange(-TOTAL.DMG.EVTYPE) 
+
+head(Storm.Economic,20)
+```
+
+***
+***
+##3. Results
+
+#### _Harmful Events to  Population Health_
+  The top 20 events with the highest total fatalities and injuries are shown graphically.
+
+```{r}
+  library(ggplot2)
+Figure1 <- ggplot(Storm_Fatalities[1:20,], aes(x=reorder(EVTYPE, -total.fatalities), y=total.fatalities, fill=EVTYPE))+geom_bar(stat="identity") + theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))+ggtitle("Top 20 Events with Highest Total Fatalities") +labs(x="EVENT TYPE", y="Total Fatalities")
+print(Figure1)
+```
+
+***
+
+```{r}
+Figure2 <- ggplot(Storm_injuries[1:20,], aes(x=reorder(EVTYPE, -total.injuries), y=total.injuries, fill=EVTYPE))+geom_bar(stat="identity") + theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))+ggtitle("Top 20 Events with Highest Total Injuries") +labs(x="EVENT TYPE", y="Total Injuries")
+print(Figure2)
+```
+**Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?**
+
+_Event type with the most harmful weather to population health was "**TORNADO**"_
+
+***
+
+#### _Economic Consequences_
+Top 15 weather event types have the greatest economic consequences are shown graphically.
+
+
+```{r}
+Figure3<- ggplot(Economic.total[1:15,], aes(x=reorder(EVTYPE, -TOTAL.DMG.EVTYPE), y=TOTAL.DMG.EVTYPE, fill=EVTYPE))+geom_bar(stat="identity") + theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))+ggtitle("Top 15 Events with Highest Economic Impact") +labs(x="EVENT TYPE", y="Total Economic Impact")
+print(Figure3)
+```
+
+
+**Across the United States, which types of events have the greatest economic consequences?**
+
+_Event type with worst economic consequence was "**FLOOD**"._
